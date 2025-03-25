@@ -234,7 +234,6 @@ vim.opt.rtp:prepend(lazypath)
 require('lazy').setup({
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
   'tpope/vim-sleuth', -- Detect tabstop and shiftwidth automatically
-
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
   -- keys can be used to configure plugin behavior/loading/etc.
@@ -245,14 +244,9 @@ require('lazy').setup({
   --    require('Comment').setup({})
 
   -- "gc" to comment visual regions/lines
-  --
   { 'sindrets/diffview.nvim', opts = {} },
   { 'numToStr/Comment.nvim', opts = {} },
-
-  -- Here is a more advanced example where we pass configuration
-  -- options to `gitsigns.nvim`. This is equivalent to the following Lua:
-  --    require('gitsigns').setup({ ... })
-  --
+  { 'mbbill/undotree', opts = {}, config = function() end },
   -- See `:help gitsigns` to understand what the configuration keys do
   { -- Adds git related signs to the gutter, as well as utilities for managing changes
     'lewis6991/gitsigns.nvim',
@@ -265,7 +259,46 @@ require('lazy').setup({
         changedelete = { text = '~' },
       },
     },
+    config = function()
+      require('gitsigns').setup {
+        on_attach = function(bufnr)
+          local gitsigns = require 'gitsigns'
+
+          local function map(mode, l, r, opts)
+            opts = opts or {}
+            opts.buffer = bufnr
+            vim.keymap.set(mode, l, r, opts)
+          end
+
+          map('n', ']c', function()
+            if vim.wo.diff then
+              vim.cmd.normal { ']c', bang = true }
+            else
+              gitsigns.nav_hunk 'next'
+            end
+          end)
+
+          map('n', '[c', function()
+            if vim.wo.diff then
+              vim.cmd.normal { '[c', bang = true }
+            else
+              gitsigns.nav_hunk 'prev'
+            end
+          end)
+
+          map('n', '<leader>ghp', gitsigns.preview_hunk)
+          map('n', '<leader>ghr', gitsigns.reset_hunk)
+          map('n', '<leader>gd', gitsigns.diffthis)
+          map('n', '<leader>gcb', gitsigns.toggle_current_line_blame)
+        end,
+      }
+    end,
   },
+
+  -- Here is a more advanced example where we pass configuration
+  --
+  -- options to `gitsigns.nvim`. This is equivalent to the following Lua:
+  --
 
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
@@ -284,25 +317,25 @@ require('lazy').setup({
 
   { -- Useful plugin to show you pending keybinds.
     'folke/which-key.nvim',
-    event = 'VimEnter', -- Sets the loading event to 'VimEnter'
+    event = 'VeryLazy', -- Sets the loading event to 'VimEnter'
     config = function() -- This is the function that runs, AFTER loading
       require('which-key').setup()
-
       -- Document existing key chains
-      require('which-key').register {
-        ['<leader>c'] = { name = '[C]ode', _ = 'which_key_ignore' },
-        ['<leader>d'] = { name = '[D]ocument', _ = 'which_key_ignore' },
-        ['<leader>r'] = { name = '[R]ename', _ = 'which_key_ignore' },
-        ['<leader>s'] = { name = '[S]earch', _ = 'which_key_ignore' },
-        ['<leader>w'] = { name = '[W]orkspace', _ = 'which_key_ignore' },
-        ['<leader>t'] = { name = '[T]oggle', _ = 'which_key_ignore' },
-        ['<leader>h'] = { name = 'Git [H]unk', _ = 'which_key_ignore' },
-        ['<leader>g'] = { namee = '[G]it', _ = 'which_key_ignore' },
+      require('which-key').add {
+        ['<leader>c'] = { group = '[C]ode' },
+        ['<leader>d'] = { group = '[D]ocument' },
+        ['<leader>r'] = { group = '[R]ename' },
+        ['<leader>s'] = { group = '[S]earch' },
+        ['<leader>w'] = { group = '[W]orkspace' },
+        ['<leader>t'] = { group = '[T]oggle' },
+        ['<leader>g'] = { group = '[G]it' },
+        ['<leader>gd'] = { group = '[G]it [D]iff' },
+        ['<leader>gcb'] = { group = '[G]it [C]urrent [B]lame' },
+        ['<leader>ghp'] = { group = '[G]it [H]unk [P]review' },
+        ['<leader>ghr'] = { group = '[G]it [H]unk [R]eset' },
+        ['<leader>]c'] = { group = 'Git Next Hunk' },
+        ['<leader>[c'] = { group = 'Git Previous Hunk' },
       }
-      -- visual mode
-      require('which-key').register({
-        ['<leader>h'] = { 'Git [H]unk' },
-      }, { mode = 'v' })
     end,
   },
 
@@ -376,7 +409,7 @@ require('lazy').setup({
       { 'nvim-telescope/telescope-ui-select.nvim' },
 
       -- Useful for getting pretty icons, but requires a Nerd Font.
-      { 'nvim-tree/nvim-web-devicons', enabled = vim.g.have_nerd_font },
+      { 'nvim-tree/nvim-web-devicons', opts = {} },
     },
     config = function()
       -- Telescope is a fuzzy finder that comes with a lot of different things that
@@ -493,7 +526,7 @@ require('lazy').setup({
             folder_closed = '',
             folder_open = '',
             folder_empty = '󰜌',
-            provider = function(icon, node, state) -- default icon provider utilizes nvim-web-devicons if available
+            provider = function(icon, node) -- default icon provider utilizes nvim-web-devicons if available
               if node.type == 'file' or node.type == 'terminal' then
                 local success, web_devicons = pcall(require, 'nvim-web-devicons')
                 local name = node.type == 'terminal' and 'terminal' or node.name
@@ -1057,6 +1090,8 @@ require('lazy').setup({
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
       require('mason-lspconfig').setup {
+        ensure_installed = ensure_installed,
+        automatic_installation = true,
         handlers = {
           function(server_name)
             local server = servers[server_name] or {}
@@ -1222,10 +1257,6 @@ require('lazy').setup({
     'rose-pine/neovim',
     name = 'rose-pine',
     config = function()
-      require('rose-pine').setup {
-        disable_background = true,
-      }
-
       vim.cmd 'colorscheme rose-pine'
 
       ColorMyPencils()
